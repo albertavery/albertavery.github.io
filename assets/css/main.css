@@ -1603,6 +1603,12 @@
 		background-size: cover;
 	}
 
+	#header-navwrap {
+		background: url("../../images/banner.jpg") center center;
+		background-size: cover;
+        padding: 0;
+	}
+
 		#header-wrapper:before {
 			content: '';
 			position: absolute;
@@ -2237,13 +2243,13 @@
 		/* Header */
 
 			#header {
-				padding: 10em 0;
+				padding: 6em 0;
 			}
 
 			.homepage #header {
 				padding: 14em 0;
 			}
-
+        
 		/* Logo */
 
 			#logo {
@@ -2597,6 +2603,10 @@
 				padding: 6em 2em 6em 2em;
 			}
 
+        #header-navwrap {
+            padding: 4em 2em 2em 2em;
+        }
+        
 			#footer-wrapper {
 				padding-top: 3em;
 			}
