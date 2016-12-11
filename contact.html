@@ -5,13 +5,36 @@
 	Free for personal and commercial use under the CCA 3.0 license (html5up.net/license)
 -->
 <html>
+    <script type="text/javascript">
+        $(document).ready(function() {
+            $("body").css("display", "none");
+        });
+    </script>
 	<head>
+        <script src="assets/js/jquery.min.js"></script>
 		<title>Home</title>
 		<meta charset="utf-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
 		<!--[if lte IE 8]><script src="assets/js/ie/html5shiv.js"></script><![endif]-->
 		<link rel="stylesheet" href="assets/css/main.css" />
 		<!--[if lte IE 8]><link rel="stylesheet" href="assets/css/ie8.css" /><![endif]-->
+        <script type="text/javascript">
+            $(document).ready(function() {
+            $("body").css("display", "none");
+ 
+                $("body").fadeIn(1000);
+ 
+                $("a.transition").click(function(event){
+                    event.preventDefault();
+                    linkLocation = this.href;
+                    $("body").fadeOut(500, redirectPage);      
+                });
+         
+            function redirectPage() {
+                window.location = linkLocation;
+                }
+                    });
+        </script>
 	</head>
 	<body class="about">
 		<div id="page-wrapper">
@@ -23,10 +46,10 @@
 							<nav id="nav">
 								<ul>
 									<li class="current"><a href="index.html">Home</a></li>
-									<li><a href="about.html">About Me</a></li>
-									<li><a href="percussion.html">Percussion</a></li>
-                                    <li><a href="projects.html">Projects</a></li>
-									<li><a href="contact.html">Contact</a></li>
+									<li><a href="about.html" class="transition">About Me</a></li>
+									<li><a href="percussion.html" class="transition">Percussion</a></li>
+                                    <li><a href="projects.html" class="transition">Projects</a></li>
+									<li><a href="contact.html" class="transition">Contact</a></li>
 								</ul>
 							</nav>
 					</div>
