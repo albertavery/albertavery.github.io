@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NFO System Information Viewer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        /* Custom styles for a modern look */
+        body {
+            font-family: 'Inter', sans-serif;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+        details {
+            border-radius: 0.5rem;
+            margin-bottom: 0.5rem;
+            background-color: rgba(255, 255, 255, 0.05);
+            transition: background-color 0.2s ease;
+        }
+        details[open] { background-color: rgba(255, 255, 255, 0.1); }
+        summary {
+            cursor: pointer;
+            padding: 1rem;
+            font-weight: 600;
+            list-style: none;
+            display: flex;
+            align-items: center;
+        }
+        summary::-webkit-details-marker { display: none; }
+        summary::before {
+            content: '►';
+            margin-right: 0.75rem;
+            font-size: 0.8em;
+            transform: rotate(0deg);
+            transition: transform 0.2s ease;
+        }
+        details[open] > summary::before { transform: rotate(90deg); }
+        .details-content { padding: 0 1rem 1rem 1rem; }
+        
+        /* Two-column grid for simple lists */
+        .data-grid { display: grid; grid-template-columns: auto 1fr; gap: 0.5rem 1rem; }
+        .data-grid-key { font-weight: 500; color: #a0aec0; white-space: nowrap; }
+        .data-grid-value { color: #e2e8f0; word-break: break-all; }
+
+        /* Table styles for structured data */
+        .table-container { overflow-x: auto; }
+        .data-table {
+            width: 100%;
+            table-layout: auto;
+            border-collapse: collapse;
+            font-size: 0.875rem;
+        }
+        .data-table th, .data-table td {
+            padding: 0.5rem 0.75rem;
+            text-align: left;
+            border-bottom: 1px solid #374151;
+            white-space: nowrap;
+        }
+        .data-table th {
+            font-weight: 600;
+            color: #9ca3af;
+            cursor: pointer;
+            position: relative;
+            user-select: none;
+        }
+        .data-table th:hover { background-color: rgba(255,255,255,0.05); }
+        .data-table th .sort-indicator {
+            display: inline-block;
+            width: 1em;
+            height: 1em;
+            margin-left: 0.5rem;
+            opacity: 0.5;
+        }
+        .data-table th.sort-asc .sort-indicator,
+        .data-table th.sort-desc .sort-indicator {
+            opacity: 1;
+        }
+        .data-table tr:last-child td { border-bottom: none; }
+
+        /* Search highlight style */
+        mark {
+            background-color: #fde047; /* yellow-300 */
+            color: #1f2937; /* gray-800 */
+            border-radius: 0.25rem;
+            padding: 2px 1px;
+        }
+        mark.active-result {
+             background-color: #fb923c; /* orange-400 */
+             box-shadow: 0 0 0 2px #fb923c;
+        }
+
+        /* Smooth scrolling */
+        html { scroll-behavior: smooth; }
+    </style>
+</head>
+<body class="bg-gray-900 text-white min-h-screen flex flex-col items-center p-4">
+
+    <div id="app" class="w-full max-w-6xl mx-auto">
+        
+        <!-- Header -->
+        <div class="text-center mb-8">
+            <h1 class="text-3xl font-bold text-white">Windows System Information Viewer</h1>
+            <p class="text-gray-400 mt-2">Open .NFO files on your Mac. Just drag and drop a file below.</p>
+        </div>
+
+        <!-- File Drop Zone -->
+        <div id="drop-zone" class="border-2 border-dashed border-gray-600 rounded-lg p-12 text-center cursor-pointer hover:border-blue-500 hover:bg-gray-800 transition-colors duration-300">
+            <svg class="mx-auto h-12 w-12 text-gray-500" stroke="currentColor" fill="none" viewBox="0 0 48 48" aria-hidden="true"><path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+            <p class="mt-4 text-lg text-gray-400">Drag & Drop your .NFO file here</p>
+            <p class="mt-1 text-sm text-gray-500">or</p>
+            <button id="file-input-btn" class="mt-2 px-4 py-2 bg-blue-600 text-white rounded-md font-semibold hover:bg-blue-700 transition">Select File</button>
+            <input type="file" id="file-input" class="hidden" accept=".nfo">
+        </div>
+        
+        <div id="loading" class="hidden text-center my-8"><p class="text-gray-400">Parsing file...</p></div>
+        <div id="error-message" class="hidden my-4 p-4 bg-red-800 border border-red-600 text-red-200 rounded-lg"></div>
+
+        <!-- Results Display -->
+        <div id="results-container" class="hidden mt-8">
+            <div class="flex justify-between items-center mb-4 pb-4 border-b border-gray-700">
+                 <h2 id="file-name" class="text-xl font-semibold text-gray-200"></h2>
+                 <button id="reset-btn" class="px-4 py-2 bg-gray-700 text-white rounded-md font-semibold hover:bg-gray-600 transition">Load Another File</button>
+            </div>
+            
+            <!-- Search UI -->
+            <div id="search-ui" class="mb-4 p-4 bg-gray-800 rounded-lg flex items-center gap-4">
+                <input type="text" id="search-input" placeholder="Find text..." class="flex-grow bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <button id="search-btn" class="px-4 py-2 bg-blue-600 text-white rounded-md font-semibold hover:bg-blue-700 transition">Find</button>
+                <button id="search-prev-btn" class="px-4 py-2 bg-gray-600 text-white rounded-md font-semibold hover:bg-gray-500 transition disabled:opacity-50" disabled>&lt; Prev</button>
+                <button id="search-next-btn" class="px-4 py-2 bg-gray-600 text-white rounded-md font-semibold hover:bg-gray-500 transition disabled:opacity-50" disabled>Next &gt;</button>
+                <span id="search-status" class="text-gray-400"></span>
+                <button id="clear-search-btn" class="px-4 py-2 text-gray-400 hover:text-white transition">Clear</button>
+            </div>
+
+            <div id="results-output" class="bg-gray-800 p-4 rounded-lg shadow-lg"></div>
+        </div>
+
+    </div>
+
+    <script>
+        // DOM element references
+        const dropZone = document.getElementById('drop-zone');
+        const fileInput = document.getElementById('file-input');
+        const fileInputBtn = document.getElementById('file-input-btn');
+        const loadingIndicator = document.getElementById('loading');
+        const resultsContainer = document.getElementById('results-container');
+        const resultsOutput = document.getElementById('results-output');
+        const errorDisplay = document.getElementById('error-message');
+        const resetBtn = document.getElementById('reset-btn');
+        const fileNameDisplay = document.getElementById('file-name');
+        
+        // Search UI elements
+        const searchInput = document.getElementById('search-input');
+        const searchBtn = document.getElementById('search-btn');
+        const searchPrevBtn = document.getElementById('search-prev-btn');
+        const searchNextBtn = document.getElementById('search-next-btn');
+        const searchStatus = document.getElementById('search-status');
+        const clearSearchBtn = document.getElementById('clear-search-btn');
+
+        let searchResults = [];
+        let currentResultIndex = -1;
+
+        // --- Event Listeners ---
+        dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('border-blue-500', 'bg-gray-800'); });
+        dropZone.addEventListener('dragleave', () => { dropZone.classList.remove('border-blue-500', 'bg-gray-800'); });
+        dropZone.addEventListener('drop', (e) => { e.preventDefault(); dropZone.classList.remove('border-blue-500', 'bg-gray-800'); handleFile(e.dataTransfer.files[0]); });
+        fileInputBtn.addEventListener('click', () => fileInput.click());
+        fileInput.addEventListener('change', (e) => { if (e.target.files.length > 0) handleFile(e.target.files[0]); });
+        resetBtn.addEventListener('click', resetView);
+        searchBtn.addEventListener('click', performSearch);
+        searchInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') performSearch(); });
+        clearSearchBtn.addEventListener('click', clearSearch);
+        searchNextBtn.addEventListener('click', () => navigateResults(1));
+        searchPrevBtn.addEventListener('click', () => navigateResults(-1));
+
+        function resetView() {
+            resultsContainer.classList.add('hidden');
+            errorDisplay.classList.add('hidden');
+            loadingIndicator.classList.add('hidden');
+            dropZone.classList.remove('hidden');
+            resultsOutput.innerHTML = '';
+            fileInput.value = '';
+            clearSearch();
+        }
+
+        function handleFile(file) {
+            if (!file.name.toLowerCase().endsWith('.nfo')) {
+                showError('Invalid file type. Please select a .NFO file.');
+                return;
+            }
+            resetView();
+            fileNameDisplay.textContent = file.name;
+            dropZone.classList.add('hidden');
+            loadingIndicator.classList.remove('hidden');
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    parseAndDisplayNFO(e.target.result);
+                    loadingIndicator.classList.add('hidden');
+                    resultsContainer.classList.remove('hidden');
+                } catch (err) {
+                    showError(`An error occurred while parsing the file: ${err.message}`);
+                    console.error(err);
+                }
+            };
+            reader.onerror = () => { showError('Failed to read the file.'); };
+            reader.readAsArrayBuffer(file);
+        }
+        
+        function showError(message) {
+            errorDisplay.textContent = message;
+            errorDisplay.classList.remove('hidden');
+            loadingIndicator.classList.add('hidden');
+            resultsContainer.classList.add('hidden');
+            dropZone.classList.remove('hidden');
+        }
+
+        function parseAndDisplayNFO(arrayBuffer) {
+            resultsOutput.innerHTML = '';
+            let nfoContent = '';
+            const dataView = new DataView(arrayBuffer);
+            if (arrayBuffer.byteLength < 2) throw new Error("File is empty or too small.");
+            const bom = dataView.getUint16(0, false);
+            if (bom === 0xFEFF) nfoContent = new TextDecoder('utf-16be').decode(arrayBuffer.slice(2));
+            else if (bom === 0xFFFE) nfoContent = new TextDecoder('utf-16le').decode(arrayBuffer.slice(2));
+            else {
+                const utf8Bom = dataView.getUint8(0) === 0xEF && dataView.getUint8(1) === 0xBB && dataView.getUint8(2) === 0xBF;
+                if (utf8Bom) nfoContent = new TextDecoder('utf-8').decode(arrayBuffer.slice(3));
+                else {
+                    try { nfoContent = new TextDecoder('utf-16le', { fatal: true }).decode(arrayBuffer); } 
+                    catch {
+                        try { nfoContent = new TextDecoder('utf-8', { fatal: true }).decode(arrayBuffer); } 
+                        catch { throw new Error("Could not determine file encoding."); }
+                    }
+                }
+            }
+            const parser = new DOMParser();
+            const startIndex = nfoContent.toUpperCase().indexOf('<MSINFO>');
+            if (startIndex === -1) throw new Error('The required <MSInfo> tag was not found.');
+            const cleanContent = nfoContent.slice(startIndex);
+            const xmlDoc = parser.parseFromString(cleanContent, "application/xml");
+            const root = xmlDoc.documentElement;
+            const parseError = root.querySelector('parsererror');
+            if (parseError) throw new Error('Could not parse XML content.');
+            if (!root || root.tagName.toLowerCase() !== 'msinfo') throw new Error(`Expected <MSInfo> root, found <${root.tagName}>.`);
+            for(const categoryNode of root.children) {
+                if(categoryNode.tagName.toLowerCase() === 'category') {
+                    resultsOutput.appendChild(createCategoryElement(categoryNode));
+                }
+            }
+        }
+        
+        function createCategoryElement(categoryNode) {
+            const details = document.createElement('details');
+            const summary = document.createElement('summary');
+            summary.textContent = categoryNode.getAttribute('name');
+            details.appendChild(summary);
+
+            const contentWrapper = document.createElement('div');
+            contentWrapper.className = 'details-content';
+            
+            const childCategories = [];
+            const dataNodes = [];
+            for(const child of categoryNode.children){
+                if(child.tagName.toLowerCase() === 'category'){
+                    childCategories.push(child);
+                } else if(child.tagName.toLowerCase() === 'data') {
+                    dataNodes.push(child);
+                }
+            }
+
+            if(dataNodes.length > 0) {
+                const renderedData = renderDataContainer(dataNodes);
+                if(renderedData) {
+                    contentWrapper.appendChild(renderedData);
+                }
+            }
+
+            childCategories.forEach(childCat => {
+                contentWrapper.appendChild(createCategoryElement(childCat));
+            });
+            
+            details.appendChild(contentWrapper);
+            return details;
+        }
+        
+        function renderDataContainer(dataNodes) {
+            if (!dataNodes || dataNodes.length === 0) return null;
+            const firstDataChildren = Array.from(dataNodes[0].children);
+            if (firstDataChildren.length === 0) return null;
+
+            const firstTag = firstDataChildren[0].tagName.toLowerCase();
+            if (firstTag === 'item') {
+                const allCells = dataNodes.flatMap(d => Array.from(d.children));
+                return createDataGrid(allCells);
+            }
+            
+            return createInferredTable(dataNodes);
+        }
+
+        function createInferredTable(dataNodes) {
+            const firstRowCells = Array.from(dataNodes[0].children);
+            const headers = firstRowCells.map(c => c.tagName);
+            const colCount = headers.length;
+            if (colCount < 1) return null; 
+            const allRowsData = dataNodes.map(d => Array.from(d.children).map(c => c.textContent));
+            return buildTable(headers, allRowsData, colCount);
+        }
+        
+        function createDataGrid(dataCells) {
+            const grid = document.createElement('div');
+            grid.className = 'data-grid';
+            for (let i = 0; i < dataCells.length; i += 2) {
+                const keyNode = dataCells[i];
+                const valueNode = dataCells[i+1];
+                if (keyNode && valueNode && (keyNode.textContent.trim() !== '' || valueNode.textContent.trim() !== '')) {
+                    const keyEl = document.createElement('div');
+                    keyEl.className = 'data-grid-key';
+                    keyEl.textContent = keyNode.textContent;
+                    const valueEl = document.createElement('div');
+                    valueEl.className = 'data-grid-value';
+                    valueEl.textContent = valueNode.textContent;
+                    grid.appendChild(keyEl);
+                    grid.appendChild(valueEl);
+                }
+            }
+            return grid.children.length > 0 ? grid : null;
+        }
+
+        function buildTable(headers, rowsOfCells, colCount) {
+            const container = document.createElement('div');
+            container.className = 'table-container';
+            const table = document.createElement('table');
+            table.className = 'data-table';
+            
+            const thead = table.createTHead();
+            const headerRow = thead.insertRow();
+            headers.forEach((headerText, index) => {
+                const th = document.createElement('th');
+                th.dataset.colIndex = index;
+                th.innerHTML = `${headerText} <span class="sort-indicator"></span>`;
+                th.addEventListener('click', () => sortTable(table, index));
+                headerRow.appendChild(th);
+            });
+            
+            const tbody = table.createTBody();
+            rowsOfCells.forEach(rowCells => {
+                if (rowCells.every(c => c.trim() === '')) return;
+                const dataRow = tbody.insertRow();
+                for (let i = 0; i < colCount; i++) {
+                    const cell = dataRow.insertCell();
+                    cell.textContent = rowCells[i] || '';
+                }
+            });
+
+            if (tbody.rows.length === 0) return null;
+            container.appendChild(table);
+            return container;
+        }
+
+        function sortTable(table, colIndex) {
+            const tbody = table.tBodies[0];
+            const rows = Array.from(tbody.rows);
+            const currentSortCol = table.dataset.sortCol;
+            const currentSortDir = table.dataset.sortDir || 'asc';
+            const newSortDir = (currentSortCol == colIndex && currentSortDir === 'asc') ? 'desc' : 'asc';
+            
+            // Define the collator for smart sorting
+            const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
+
+            rows.sort((rowA, rowB) => {
+                const cellA = rowA.cells[colIndex].textContent.trim();
+                const cellB = rowB.cells[colIndex].textContent.trim();
+                const comparison = collator.compare(cellA, cellB);
+                return newSortDir === 'asc' ? comparison : -comparison;
+            });
+
+            // Update sort state and indicators
+            table.dataset.sortCol = colIndex;
+            table.dataset.sortDir = newSortDir;
+            
+            table.querySelectorAll('th').forEach(th => {
+                th.classList.remove('sort-asc', 'sort-desc');
+                th.querySelector('.sort-indicator').innerHTML = '';
+            });
+
+            const activeTh = table.querySelector(`th[data-col-index="${colIndex}"]`);
+            if (activeTh) {
+                activeTh.classList.add(newSortDir === 'asc' ? 'sort-asc' : 'sort-desc');
+                activeTh.querySelector('.sort-indicator').innerHTML = newSortDir === 'asc' ? '▲' : '▼';
+            }
+
+            // Re-append sorted rows
+            rows.forEach(row => tbody.appendChild(row));
+        }
+
+        // --- Search Functions ---
+        
+        function performSearch() {
+            clearSearch();
+            const searchTerm = searchInput.value;
+            if (!searchTerm || searchTerm.length < 2) {
+                searchStatus.textContent = 'Enter at least 2 characters.';
+                return;
+            }
+            
+            const regex = new RegExp(searchTerm, 'gi');
+            const walker = document.createTreeWalker(resultsOutput, NodeFilter.SHOW_TEXT, null, false);
+            let node;
+            const nodesToReplace = [];
+
+            while(node = walker.nextNode()) {
+                if (node.textContent.match(regex) && node.parentElement.tagName.toLowerCase() !== 'script' && node.parentElement.tagName.toLowerCase() !== 'style') {
+                    nodesToReplace.push(node);
+                }
+            }
+
+            nodesToReplace.forEach(node => {
+                const span = document.createElement('span');
+                span.innerHTML = node.textContent.replace(regex, match => `<mark>${match}</mark>`);
+                node.parentNode.replaceChild(span, node);
+            });
+            
+            searchResults = resultsOutput.querySelectorAll('mark');
+            if(searchResults.length > 0) {
+                currentResultIndex = -1;
+                navigateResults(1);
+            }
+            updateSearchStatus();
+        }
+
+        function clearSearch() {
+            resultsOutput.querySelectorAll('mark').forEach(mark => {
+                const parent = mark.parentNode;
+                while(mark.firstChild) {
+                    parent.insertBefore(mark.firstChild, mark);
+                }
+                parent.removeChild(mark);
+                parent.normalize();
+            });
+            
+            searchResults = [];
+            currentResultIndex = -1;
+            updateSearchStatus();
+        }
+
+        function updateSearchStatus() {
+            if (searchResults.length > 0) {
+                searchStatus.textContent = `${currentResultIndex + 1} of ${searchResults.length} found`;
+            } else if (searchInput.value.trim().length > 1) {
+                searchStatus.textContent = 'No results found.';
+            } else {
+                searchStatus.textContent = '';
+            }
+            searchNextBtn.disabled = currentResultIndex >= searchResults.length - 1;
+            searchPrevBtn.disabled = currentResultIndex <= 0;
+        }
+
+        function navigateResults(direction) {
+            if (searchResults.length === 0) return;
+            if (searchResults[currentResultIndex]) {
+                searchResults[currentResultIndex].classList.remove('active-result');
+            }
+            currentResultIndex += direction;
+            const activeResult = searchResults[currentResultIndex];
+            activeResult.classList.add('active-result');
+            let parent = activeResult.parentElement;
+            while(parent) {
+                if(parent.tagName.toLowerCase() === 'details') {
+                    parent.open = true;
+                }
+                parent = parent.parentElement;
+            }
+            activeResult.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            updateSearchStatus();
+        }
+
+    </script>
+</body>
+</html>
